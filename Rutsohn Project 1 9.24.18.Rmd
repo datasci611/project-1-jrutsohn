@@ -1,0 +1,169 @@
+
+---
+title: <center><h1><font size = 12>BENFORD'S LAW</font size></h1></center>  
+author: <center><h1><font size = 4>*Josh Rutsohn*</font size></h1></center>   
+date: <center><h1><font size = 4>*9/23/2018*</font size></h1></center>  
+output: html_document
+---
+
+```{r, echo=F, results='hide', include=F}
+require(dplyr)
+require(magrittr)
+require(tibble)
+require(tidyverse)
+require(ggplot2)
+require(knitr)
+require(kableExtra)
+require(psych)
+require(gridExtra)
+```
+
+##Uniformity
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Many natural phenomena are observed as random variables with accompanying distributions.  These distributions have associated means and variances that may be calculated if the distributions are known or estimated under specific assumptions about the data of the natural phenomena.  One standard distribution is the uniform distribution, which gives equal probability to each outcome if the phenomenon is a discrete random variable or weights the probability of each outcome based on the length of the interval if the phenomenon is a continuous random variable.  A common example of a discrete random variable with a uniform distribution is a coin flip.  Given the coin is fair, the probability of seeing 'Heads' is equal to the probability of seeing 'Tails'.  That is,
+
+<center>$P(Heads) = P(Tails) = \frac{1}{2}.$</center>
+&nbsp;
+
+This formulation is fairly intuitive.  People play games with coins and dice from an early age, and usually the introductory examples of probability are random variables with discrete uniform distributions.  The point is that uniform distributions make a lot of sense to most people, and many of the aforementioned phenomena (e.g., dice rolls, coin flips) are obviously uniform.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;When a student begins to learn about combinatorics and probability, she may be given an exercise similar to this:
+
+    An employee at the DMV needs to determine whether the current license plate rubric will sustain the driving popu-lation of his state.  Assume that his state's license plates must follow this rubric: the first three places are occupied by letters and the last four are occupied by numbers.  If the state has 15,000,000 drivers, will there be enough unique license plates for each driver?
+    
+And the student can use her knowledge of combinatorics to determine that the number of unique license plates is $26^3 * 10^4 = 175,760,000$ meaning that there are more than enough license plates to go around.  Of course, this exercise leads to the student using combinatorics to calculate probabilities more simply.  Given a sample space, then the probability of an event occurring is just counting the number of events and dividing by the size of the sample space.  Using the previous exercise, one could calculate the probability of having all letters being the same on a license plate or the probability that the number listed is a perfect square.  The ease of these calculations primarily has to do with the fact that digits are uniformly distributed, thus making the combinatorics easy.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Another, perhaps more interesting, example is detecting accounting fraud for auditing.  If one suspects that a local clerk is submitting fraudulent socioeconomic data to use for a public planning project, then the auditor could simply look at the distribution of the digits of the socioeconomic data.  Each number from 0 - 9 should equally likely show up at each digit (except for maybe 0 and the first digit) of salary and tax data--10% of the time. At least this probability estimate follows intuition.  
+
+Unfortunately, this intuition is simply wrong.
+
+
+##Benford's Law
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Digits of numbers follow Benford's law if
+
+<center>$P(d) = log_{10}(1 + \frac{1}{d})$</center>
+for the first digit, *d*, and 
+<center>$P(d) = \sum_{k = 10^{n - 2}}^{10^{n-1}-1}log_{10}(1 + \frac{1}{10k + d})$</center>
+for the nth position of digit *d*.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;While Benford's Law is named after the physicist Frank Benford, its discovery can be traced to the 19th century astronomer, Simon Newcomb.  he noticed more wear-and-tear in the logarithm tables for values that started with 1 than he did for those with other values.  Newcomb proposed a law that the probability of a single value, *d*, being the first digit of a multidigited number was equal to $log(d + 1) - log(d) = log(1 + \frac{1}{d}).$  This phenomenon was later noticed by Frank Benford, who deliberated more on this result by demonstrating its prolificacy in nature (e.g. in the surface area of rivers).  The general idea is that given a phenomenon's unboundedness or lack of manipulation, then the phenomenon's numeric values per digit follow the distribution listed above.  A table of probabilities for the first digit being of a value from 1 - 9 is listed below.
+
+
+```{r, echo=F}
+benford.data <- as_tibble(seq(1:9))
+benford.data %<>% mutate(p.d = log10(1 + 1/value))
+benford.data.b <- benford.data %>% mutate(d = value - 1)
+```
+
+```{r, echo=F}
+kable(benford.data, col.names = c("Digit", "P(d)")) %>% kable_styling(full_width = F)
+```
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Benford's Law has been used in many settings, such as auditing as alluded to earlier^1^.  Further examples have been in detecting election fraud, psychological pricing analysis, size differences in eukaryotic and prokaryotic cells, and even with analysis of scientific fraud by examining regression coefficients.  Some examples are given in the data analyses below.
+
+<font size = 0.5>^1^ = In actuality, since many people presume digits are uniformly distributed, fraudulent documents often look TOO uniform in their values.  Benford's Law is applied by seeing whether 1 shows up as expected as a first digit approximately 30% of the time.  If the frequency of 9s and 1s are about the same, then shenanigans are likely afoot.</font size>
+
+
+##The Data
+```{r, echo=F}
+Seatbelts.tib <- as_tibble(Seatbelts)
+state.x77.tib <- as_tibble(state.x77)
+treering.tib <- as_tibble(treering)
+rock.tib <- as_tibble(rock)
+```
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;To illustrate Benford's Law in action, consider four of the datasets that are packaged with R: `Seatbelts`, `state.x77`, `treering`, and `rock`.  The dataset `Seatbelts` is an accompaniment to the `UKDriverDeaths` dataset in R, which is a time series of monthly totals of car injuries or deaths in the United Kingdom between January 1969 and December 1984.  The original data were derived from Harvey and Durbin's 1986 paper that evaluated the efficacy of compulsory seatbelt legislation on driver deaths/injuries.  Summary statistics can be seen below.  While just about any variable could be used from this dataset, the focus will be on `DriversKilled`, which measures the monthly death rate in this time series.
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The `state.x77` dataset provides some facts for all 50 U.S. states from around the 1970's.  A summary table can be seen below that details the population, yearly income, illiteracy rate, life expectancy, murder rate, high school graduation proportion, mean number of days with minimum temperature below freezing, and land area in square miles.  Rather than look at any of these variables individually, a series of of simple linear regressions were performed estimating mean income conditioned on a single & pairwise combination of the other variables.  The regression coefficients were then examined to determine whether they follow Benford's Law.
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The `treering` data set is a univariate time series of n = 7981 observations that examines tree ring width per year.  The measurements of these tree ring widths date from approximately 6000 B.C. to A.D. 1979.  The data themselves are normalized, meaning they should not follow Benford's Law.  The purpose of these data's inclusion is to show a counterexample.  The data were originally recorded by Donald Graybill in 1980 on a Great Basin Bristlecone Pine.  Tree ring widths help paleontologists and climatologists measure the local climate at various points in history, especially during periods where written records of climate and weather do not exist (such as 6000 B.C.).  Summary statistics for the tree ring widths is provided below.
+
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The `rock` dataset contains geological measurements of 48 rock samples from a petroleum reservoir.  Twelve core samples were taken from 4 different cross-sections of each rock, and the permeability, total area of pores, total perimeter of pores, and shape ($=\frac{perimeter}{\sqrt{area}}$) were measured.  The example of Benford's Law examines the shape variable.  Data were originally collected by BP Research and image analyses were done by Ronit Katz at the University of Oxford.  A table of summary statistics for `rock` is provided below.
+```{r, echo = F}
+kable(round(describe(Seatbelts.tib),3), caption = "Summary Statistics of Seatbelts Data") %>% kable_styling(full_width = T)
+kable(round(describe(state.x77.tib),3), caption = "Summary Statistics of US State Facts Data") %>% kable_styling(full_width = T)
+kable(round(describe(treering),3), caption = "Summary Statistics of Tree Ring Data") %>% kable_styling(full_width = T)
+kable(round(describe(rock.tib),3), caption = "Summary Statistics of Rock Data") %>% kable_styling(full_width = T)
+```
+
+```{r, echo = F}
+#Apologies for this hideous code--I was receiving conflicts between plyr and dplyr, so I had to go this direct route
+m1 <- lm(Income ~ Population, data=state.x77.tib)
+m2 <- lm(Income ~ Illiteracy, data=state.x77.tib)
+m3 <- lm(Income ~ `Life Exp`, data=state.x77.tib)
+m4 <- lm(Income ~ Murder, data=state.x77.tib)
+m5 <- lm(Income ~ `HS Grad`, data=state.x77.tib)
+m6 <- lm(Income ~ Frost, data=state.x77.tib)
+m7 <- lm(Income ~ Area, data=state.x77.tib)
+m8 <- lm(Income ~ Population + Illiteracy, data=state.x77.tib)
+m9 <- lm(Income ~ Population + `Life Exp`, data=state.x77.tib)
+m10 <- lm(Income ~ Population + Murder, data=state.x77.tib)
+m11 <- lm(Income ~ Population + `HS Grad`, data=state.x77.tib)
+m12 <- lm(Income ~ Population + Frost, data=state.x77.tib)
+m13 <- lm(Income ~ Population + Area, data=state.x77.tib)
+m14 <- lm(Income ~ Illiteracy + `Life Exp`, data=state.x77.tib)
+m15 <- lm(Income ~ Illiteracy + Murder, data=state.x77.tib)
+m16 <- lm(Income ~ Illiteracy + `HS Grad`, data=state.x77.tib)
+m17 <- lm(Income ~ Illiteracy + Frost, data=state.x77.tib)
+m18 <- lm(Income ~ Illiteracy + Area, data=state.x77.tib)
+m19 <- lm(Income ~ `Life Exp` + Murder, data=state.x77.tib)
+m20 <- lm(Income ~ `Life Exp` + `HS Grad`, data=state.x77.tib)
+m21 <- lm(Income ~ `Life Exp` + Frost, data=state.x77.tib)
+m22 <- lm(Income ~ `Life Exp` + Area, data=state.x77.tib)
+m23 <- lm(Income ~ Murder + `HS Grad`, data=state.x77.tib)
+m24 <- lm(Income ~ Murder + Frost, data=state.x77.tib)
+m25 <- lm(Income ~ Murder + Area, data=state.x77.tib)
+m26 <- lm(Income ~ `HS Grad` + Frost, data=state.x77.tib)
+m27 <- lm(Income ~ `HS Grad` + Area, data=state.x77.tib)
+m28 <- lm(Income ~ Frost + Area, data=state.x77.tib)
+
+sum.state <- rbind(summary(m1)$coefficients[2], summary(m2)$coefficients[2], summary(m3)$coefficients[2], summary(m4)$coefficients[2], summary(m5)$coefficients[2], summary(m6)$coefficients[2], summary(m7)$coefficients[2])
+sum.state2 <- rbind(summary(m8)$coefficients[2:3], summary(m9)$coefficients[2:3], summary(m10)$coefficients[2:3], summary(m11)$coefficients[2:3], summary(m12)$coefficients[2:3], summary(m13)$coefficients[2:3], summary(m14)$coefficients[2:3], summary(m15)$coefficients[2:3], summary(m16)$coefficients[2:3], summary(m17)$coefficients[2:3], summary(m18)$coefficients[2:3], summary(m19)$coefficients[2:3], summary(m20)$coefficients[2:3], summary(m21)$coefficients[2:3], summary(m22)$coefficients[2:3], summary(m23)$coefficients[2:3], summary(m24)$coefficients[2:3], summary(m25)$coefficients[2:3], summary(m26)$coefficients[2:3], summary(m27)$coefficients[2:3], summary(m28)$coefficients[2:3])
+sum.state3 <- stack(data.frame(sum.state2))
+sum.state3 <- sum.state3[,1]
+sum.state4 <- c(sum.state, sum.state3)
+state.reg.tib <- as_tibble(sum.state4)
+```
+```{r}
+Seatbelts.tib %<>% mutate(first.killed = as.numeric(sub('^(.).*$','\\1', DriversKilled))) 
+treering.tib %<>% mutate(first.x = as.numeric(sub('^(.).*$','\\1', x))) 
+rock.tib %<>% mutate(first.peri = as.numeric(sub('^(.).*$','\\1', peri))) 
+state.reg.tib %<>% mutate(reg.coef = abs(value)) %>% mutate(first.reg = as.numeric(sub('^(.).*$','\\1', reg.coef))) 
+```
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The figures below show histograms of the first digits of each estimate from the variables used from the four data sets.  Overlayed on each histogram is the predicted probability of the digit being 1^st^ given Benford's Law is true.  What we can see is that among the four data sets, two have a decent fit with Benford's law (i.e. the perimeter variable from `rock` and the regression coefficients calculated from `state.x77`).  The data set that was not supposed to follow Benford's law, `treering`, does not fit the law.  This fact is expected since the tree ring data were normalized for each estimate.  It's possible that the raw data would fit Benford's law.  
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unexpectedly, UK monthly car fatalities did not follow Benford's law.  The first digit of these deaths were primarily 1 and sometimes 8 or 9.  I would hypothesize that these data are somewhat normally distributed with a mean around 100, meaning that Benford's Law would likely not apply.  In fact, from the summary table we see that $\bar{x} = 122.8$ and $s = 25.4$.  Thus it makes sense for a lot of these monthly deaths to be in the 100 - 199 range with some falling in the 80s or 90s (perhaps when seatbelt laws were compulsory), and there were no observations in the 200+ range.
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The best fit data were the regression coefficients, which were derived from the original data.  Since the estimates were derived from the application of minimizing residuals, any natural distribution of the data for these states was obviated.  With that said, not all derived data necessarily follow Benford's Law--IQ tests are standardized and thus would not work, and pricing data is manipulated to encourage purchase (e.g., people are more likely to buy a \$3.99 item than a \$4.00 item.)
+
+```{r}
+a <- ggplot(Seatbelts.tib, aes(x=first.killed)) + geom_bar(aes(y=(..count..)/sum(..count..)), fill='blue') +
+     scale_x_discrete(limits=c(1,2,3,4,5,6,7,8,9)) + 
+     geom_line(data=benford.data, mapping=aes(x=value,y=p.d), color='red') + ylab("Proportion") + xlab("Seatbelts") +
+     geom_point(data=benford.data, mapping=aes(x=value,y=p.d), color='red')
+b <- ggplot(treering.tib, aes(x=first.x), color='blue') + geom_bar(aes(y=(..count..)/sum(..count..)), fill='blue') +
+     scale_x_discrete(limits=c(0,1)) + 
+     geom_line(data=benford.data.b, mapping=aes(x=d,y=p.d), color='red') + ylab("Proportion") + xlab("Tree Rings") +
+     geom_point(data=benford.data.b, mapping=aes(x=d,y=p.d), color='red')
+c <- ggplot(rock.tib, aes(x=first.peri), color='blue') + geom_bar(aes(y=(..count..)/sum(..count..)), fill='blue') +
+     scale_x_discrete(limits=c(1,2,3,4,5,6,7,8,9)) + 
+     geom_line(data=benford.data, mapping=aes(x=value,y=p.d), color='red') + ylab("Proportion") + xlab("Rocks") +
+     geom_point(data=benford.data, mapping=aes(x=value,y=p.d), color='red')
+d <- ggplot(state.reg.tib, aes(x=first.reg), color='blue') + geom_bar(aes(y=(..count..)/sum(..count..)), fill='blue') +
+     scale_x_discrete(limits=c(0,1,2,3,4,5,6,7,8,9)) + 
+     geom_line(data=benford.data.b, mapping=aes(x=d,y=p.d), color='red')  + ylab("Proportion") +
+     xlab("State Regression Coefficients") + geom_point(data=benford.data.b, mapping=aes(x=d,y=p.d), color='red')
+grid.arrange(a, b, c, d, ncol=2)
+```
+
+
+##Conclusion
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Having these counter-intuitive laws of probability actually helps with detecting fraud, making Benford's Law more than some pathological case study in probability.  With that said though, since it tracks so well with certain biological, chemical, and astronomical data, it may be worth emphasizing more as a method of estimation.  Certain tests, such as the Kuiper Test, have been developed to make statistical inferences about these Benford distributions.  Furthermore, the moments have been diligently calculated by Scott and Fasli (2001).  While not the most vital probabilistic law, it is worth delineating its boons to general scientific and forensic audiences.
+
+##References
+(1) Harvey, A.C., Durbin, J. (1986).  "The effects of seat belt legislation on British road casualties: A case study in structural time series modelling". *Journal of the Royal Statistical Society* series A, **149**, 187-227.
+(2) Nigrini, Mark J. (1999).  "I've Got Your Number: How a mathematical phenomenon can help CPAs uncover fraud and other irregularities".  *Journal of Accountancy*.
+(3) Scott, P.D., Fasli, M. (2001).  "Benford's Law: An empirical investigation and a novel explanation." *CSM Technical Report* 349, Department of Computer Science, University of Essex.
+(4) Varian, Hal (1972).  "Benford's Law (Letters to the Editor)". *The American Statistician*. **26** (3): 65.
+
